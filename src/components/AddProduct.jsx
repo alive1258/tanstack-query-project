@@ -1,53 +1,58 @@
-/* eslint-disable no-unused-vars */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { useState } from 'react'
 
-const AddProduct = () => {
+const AddProduct = ({ initialProduct = null }) => {
   const queryClient = useQueryClient()
 
-  const [state, setState] = useState({
-    title: '',
-    description: '',
-    price: 0,
-    rating: 5,
-    thumbnail: '',
-  })
+  const [state, setState] = useState(
+    initialProduct || {
+      title: '',
+      description: '',
+      price: 0,
+      rating: 5,
+      thumbnail: '',
+    }
+  )
+
+  const isUpdate = !!initialProduct // Check if it's an update or addition
 
   const mutation = useMutation({
-    mutationFn: newProduct =>
-      axios.post('http://localhost:3000/products', newProduct),
-    onSuccess: (data, variables, context) => {
-      console.log(context)
+    mutationFn: product => {
+      if (isUpdate) {
+        // PATCH request for updating existing product
+        return axios.patch(
+          `http://localhost:3000/products/${product.id}`,
+          product
+        )
+      } else {
+        // POST request for adding new product
+        return axios.post('http://localhost:3000/products', product)
+      }
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries(['products'])
     },
-    onMutate: variables => {
+    onMutate: () => {
       return { greeting: 'Say hello' }
     },
   })
 
   const submitData = event => {
     event.preventDefault()
-    console.log(state)
-    const newData = { ...state, id: crypto.randomUUID().toString() }
-    mutation.mutate(newData)
+    mutation.mutate(state)
   }
 
   const handleChange = event => {
-    const name = event.target.name
-    const value =
-      event.target.type === 'number'
-        ? event.target.valueAsNumber
-        : event.target.value
-
-    setState({
-      ...state,
+    const { name, value } = event.target
+    setState(prevState => ({
+      ...prevState,
       [name]: value,
-    })
+    }))
   }
 
   if (mutation.isLoading) {
-    return <span>Submitting...</span>
+    return <span>{isUpdate ? 'Updating...' : 'Adding...'}</span>
   }
   if (mutation.isError) {
     return <span>Error: {mutation.error.message}</span>
@@ -55,8 +60,10 @@ const AddProduct = () => {
 
   return (
     <div className="m-2 p-2 bg-gray-100 w-1/5 h-1/2">
-      <h2 className="text-2xl my-2">Add a Product</h2>
-      {mutation.isSuccess && <p>Product Added!</p>}
+      <h2 className="text-2xl my-2">{isUpdate ? 'Update' : 'Add'} Product</h2>
+      {mutation.isSuccess && (
+        <p>{isUpdate ? 'Product Updated!' : 'Product Added!'}</p>
+      )}
       <form className="flex flex-col" onSubmit={submitData}>
         <input
           type="text"
@@ -95,7 +102,7 @@ const AddProduct = () => {
           type="submit"
           className="bg-black m-auto text-white text-xl p-1 rounded-md"
         >
-          Add
+          {isUpdate ? 'Update' : 'Add'}
         </button>
       </form>
     </div>

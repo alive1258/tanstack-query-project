@@ -1,6 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+/* eslint-disable react/prop-types */
 import { useState } from 'react'
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
 
 const retrieveProducts = async ({ queryKey }) => {
   const response = await axios.get(
@@ -9,35 +11,27 @@ const retrieveProducts = async ({ queryKey }) => {
   return response.data
 }
 
-const ProductList = () => {
+const ProductList = ({ onSelectedProduct }) => {
+  const queryClient = useQueryClient()
+
   const [page, setPage] = useState(1)
   const {
     data: products,
     error,
     isLoading,
-    refetch,
   } = useQuery({
     queryKey: ['products', { page }],
     queryFn: retrieveProducts,
   })
 
-  const deleteProductMutation = useMutation(
-    productId => axios.delete(`http://localhost:3000/products/${productId}`),
-    {
-      onSuccess: () => {
-        refetch() // Refetch the product list after deletion
-      },
-    }
-  )
-
-  const handleDelete = productId => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      deleteProductMutation.mutate(productId)
-    }
-  }
+  //halaman delet mutation and query invalidation
+  const { mutate: deleteMutation } = useMutation({
+    mutationFn: id => axios.delete(`http://localhost:3000/products/${id}`),
+    onSuccess: () => queryClient.invalidateQueries(['products', { page }]),
+  })
 
   if (isLoading) return <div>Fetching Products...</div>
-  if (error) return <div>An error occurred: {error.message}</div>
+  if (error) return <div>An error occured: {error.message}</div>
 
   return (
     <div className="flex flex-col justify-center items-center w-3/5">
@@ -49,13 +43,21 @@ const ProductList = () => {
               key={product.id}
               className="flex flex-col items-center m-2 border rounded-sm"
             >
-              <img
-                className="object-cover h-64 w-96 rounded-sm"
-                src={product.thumbnail}
-                alt={product.title}
-              />
-              <p className="text-xl my-3">{product.title}</p>
-              <button onClick={() => handleDelete(product.id)}>Delete</button>
+              <div onClick={() => onSelectedProduct(product.id)}>
+                {' '}
+                <img
+                  className="object-cover h-64 w-96 rounded-sm"
+                  src={product.thumbnail}
+                  alt={product.title}
+                />
+                <p className="text-xl my-3">{product.title}</p>
+              </div>{' '}
+              <button
+                onClick={() => deleteMutation(product.id)}
+                className="text-red-500 hover:bg-red-500 hover:text-white rounded-md"
+              >
+                delete
+              </button>
             </li>
           ))}
       </ul>
